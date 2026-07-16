@@ -53,6 +53,10 @@ It consists of two parts:
 - **Abort Stream (`STOP`):** While generating, the send button turns into a red `STOP` button. Clicking it triggers an `AbortController` signal to stop the local/cloud stream and release CPU resources.
 - **Clean Monospace Analytics:** Displays real-time CPU/RAM hardware stats in the header (pulled directly from Rust `sysinfo`), along with real-time generation speed (T/S) calculations.
 ---
+### 7. API Compatibility & External Integrations
+- **Standard API Support:** The backend maintains compatibility with the standard Ollama REST API. You can easily interact with your local models using custom scripts (e.g., Python `requests`, Node.js, or `curl`) by simply routing your requests to port `11500`.
+- **Ecosystem Compatibility:** Integrates with third-party tools, frameworks, and orchestration libraries that natively support Ollama (such as LangChain, LlamaIndex, or AutoGen) by pointing them to the custom port.
+- **Remote Deployment Capable:** Because the engine is built on a Go/C++ core, it can be compiled and run as a standalone backend service on remote servers (VPS/VDS). This allows you to offload heavy computation and use the backend as a private, centralized API endpoint.
 
 ## 🛠️ Technical Architecture
 
