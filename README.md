@@ -13,7 +13,7 @@ It consists of two parts:
 
 ### 1. Unified Local & Cloud Multimodal Support
 - **Local Inference:** Runs open-weight GGUF models locally on your PC on a dedicated, non-conflicting port (`11500`) using custom environment variables (`EXIS_MODELS`, `EXIS_DEBUG`, etc.).
-- **Cloud Models Integration:** Real-time loading of Google's **Gemini** models (e.g., `gemini-2.5-flash`) directly from Google AI Studio using an API key (I intend to add support for other cloud models, but I chose Google first because their API is free) 
+- **Cloud Models Integration:** Real-time loading of Google's **Gemini** models (e.g., `gemini-2.5-flash`) directly from Google AI Studio using an API key (intend to add support for other cloud models, but I chose Google first because their API is free) 
 - **Multimodal Vision:** Drag-and-drop or select images to send to both local Vision models (like `qwen2-vl` or `llava`), with image rendering inside chat bubbles.
 
 
@@ -28,7 +28,7 @@ It consists of two parts:
 ### 3. Computational Throttle (Background CPU Limiter)
 - **Hardware Protection:** In settings, you can adjust the "Background Throttle" from **10% to 90%** via a slider. 
 - When the main app is minimized to the system tray, `exis` automatically cuts the allocated CPU threads (`num_thread`) to your background model in half (or by your custom percentage) to keep your PC responsive for gaming or coding.
-- **In addition, the settings cover a wide range of options**, such as the *system prompt*, *cores* (as I mentioned earlier), and penalties. There are also API keys for *Gemini* and *Tavily*. And most importantly: **the ExisDB input field.**
+- **In addition, the settings cover a wide range of options**, such as the *system prompt*, *CPU cores* , and penalties. There are also API keys for *Gemini* and *Tavily*. And most importantly: **the ExisDB input field.**
 
 <img src="https://github.com/examegd/EXis.Architect/blob/media/IMG_20260716_175828_359.png" width="400" alt="setting">
 
