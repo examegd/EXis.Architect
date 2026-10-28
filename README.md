@@ -1,115 +1,124 @@
-# exis.Architect (v1.0.0)
+# exis.Architect (v2.0.0)
 
-`exis.Architect` is a customized, lightweight, local/cloud-hybrid AI assistant suite designed with a dark-matte, glowing-green sci-fi aesthetic inspired by the **Precursor/Architect technology**. 
+`exis.Architect` is a lightweight, local/cloud-hybrid AI desktop client and inference suite featuring a dark-matte, glowing-green sci-fi interface.
 
-It consists of two parts:
-1. **`exis.exe` (Backend):** A custom Go/C++ local inference engine derived from Ollama.
-2. **`exis.Architect` (Frontend):** A hardware-accelerated desktop interface built using Tauri v2 (Rust) and React (TypeScript).
+The project is built on three core components:
+1. **`exis.exe` (Backend):** A local inference engine based on Ollama / `llama.cpp` (Go/C++).
+2. **`ExisQuant` (Native Engine):** A standalone CUDA C++ / Rust inference engine utilizing the proprietary `.exiq` quantization format.
+3. **`exis.Architect` (Frontend):** A hardware-accelerated desktop interface built with Tauri v2 (Rust) and React / TypeScript.
+
 <img src="https://github.com/examegd/EXis.Architect/blob/media/IMG_20260716_175830_410.png" width="400" alt="exis.Architect">
 
 ---
 
-## 🚀 Key Features
+## Key Features
 
 ### 1. Unified Local & Cloud Multimodal Support
-- **Local Inference:** Runs open-weight GGUF models locally on your PC on a dedicated, non-conflicting port (`11500`) using custom environment variables (`EXIS_MODELS`, `EXIS_DEBUG`, etc.).
-- **Cloud Models Integration:** Real-time loading of Google's **Gemini** models (e.g., `gemini-2.5-flash`) directly from Google AI Studio using an API key (intend to add support for other cloud models, but I chose Google first because their API is free) 
-- **Multimodal Vision:** Drag-and-drop or select images to send to both local Vision models (like `qwen2-vl` or `llava`), with image rendering inside chat bubbles.
+- **Local GGUF Inference:** Runs open-weight GGUF models locally on a dedicated port (`11500`) configured via environment variables (`EXIS_MODELS`, `EXIS_DEBUG`).
+- **Cloud Models Integration:** Direct API integration with Google Gemini models via Google AI Studio keys.
+- **Multimodal Vision:** Image attachments supported for local vision models (such as `qwen2-vl` and `llava`) with in-chat image rendering.
+
+### 2. ExisQuant (`.exiq`) Inference Engine
+In addition to GGUF, the project includes an independent runtime and quantization pipeline written in Rust and CUDA C++ without external runtime dependencies.
 
 
+- **Q4 Block Quantization:** FP16 weights are packed into 4-bit values (two weights per byte) with a block group size of 32 and independent scale factors. Reduces a 3B model from ~7 GB down to 2.2 GB (and 1.5B models to ~1.1 GB).
+- **Single-File Container:** The `.exiq` container packages both quantized weights and tokenizer metadata into a single binary mapped directly to host memory via `mmap`.
+- **Split Memory Layout:** Scales and 4-bit weights are partitioned into contiguous blocks. NVIDIA GPUs load weights via 128-bit vector reads (`uint4` / `LDG.128`), reading 32 weights per instruction to maximize bus throughput.
+- **Shared Memory Cache:** Hidden state vectors are cached in GPU shared memory / L1 cache to minimize global VRAM traffic.
+- **Tensor Core (WMMA) Execution:** Leverages NVIDIA Tensor Cores for $16 \times 16 \times 16$ half-precision matrix multiplication tiles. 
+- **Prefix Caching:** KV-cache state is preserved between turns. Matching prompt prefixes are skipped without recomputation, minimizing time-to-first-token (TTFT) during long multi-turn sessions.
+- **Native OpenAI-Compatible API (Port 11600):** Runs an independent HTTP server on port `11600` exposing a standard `/v1/chat/completions` endpoint with SSE streaming.
 
+<img src="https://github.com/examegd/EXis.Architect/blob/media/speed.png" width="400" alt="ExisQuant Speed">
 
-### 2. Symmetrical Sentry & Tactical HUD
-- **Main Workspace:** A two-column dashboard with smooth scrolling lists for chat history, settings, and model compilation.
-- **Tactical HUD (Overlay):** A frameless, transparent, always-on-top floating widget sitting in the system tray. Pressing `?` opens a minimalist input prompt. Clicking the collapse button `⤢` restores the main window and hides the HUD.
-- **System Tray Integration:** Intercepts standard Windows close requests to minimize/hide the app to the tray instead of terminating, with background process lifecycle management.
+### 3. Symmetrical Sentry & Tactical HUD
+- **Main Workspace:** Two-column layout with smooth scrolling for chat history, settings, and model compilation.
+- **Tactical HUD (Overlay):** Frameless, transparent floating widget docked in the system tray. Pressing `?` opens a minimal prompt bar; the collapse icon `⤢` switches back to the main interface.
+- **System Tray Management:** Intercepts close events to keep background services active without terminating execution.
+
 <img src="https://github.com/examegd/EXis.Architect/blob/media/IMG_20260716_174650_688.png" width="400" alt="Example tray mode">
 
-### 3. Computational Throttle (Background CPU Limiter)
-- **Hardware Protection:** In settings, you can adjust the "Background Throttle" from **10% to 90%** via a slider. 
-- When the main app is minimized to the system tray, `exis` automatically cuts the allocated CPU threads (`num_thread`) to your background model in half (or by your custom percentage) to keep your PC responsive for gaming or coding.
-- **In addition, the settings cover a wide range of options**, such as the *system prompt*, *CPU cores* , and penalties. There are also API keys for *Gemini* and *Tavily*. And most importantly: **the ExisDB input field.**
+### 4. Background CPU Limiter (Computational Throttle)
+- **Dynamic Thread Scaling:** Configurable background throttle slider (10% to 90%).
+- Minimizing the application to the tray automatically reduces the active thread count (`num_thread`) to reduce system load during gaming or development workflows.
+- Configurable settings cover system prompts, CPU core limits, repetition penalties, API keys (Gemini, Tavily), and ExisDB configuration.
 
 <img src="https://github.com/examegd/EXis.Architect/blob/media/IMG_20260716_175828_359.png" width="400" alt="setting">
 
+### 5. Local Memory Database (`exisdb.json`)
+- **Conversational Memory:** Stores long-term user facts in plain JSON at `Documents/exis/exisdb.json`.
+- **Keyword RAG:** Local retrieval engine with Russian stemming, automatically injecting relevant user context into incoming prompts.
+- **Diff Confirmation Protocol:** Background model suggests updates, additions, or deletions via a visual diff panel (`MEMORIAL_UPDATE_PROTOCOL`), requiring explicit `COMMIT` or `ABORT` from the user.
 
-### 4. Local Memory Database (`exisdb.json`)
-- **Conversational Memory:** A private, human-readable JSON database (`exisdb.json`) created automatically in your `Documents/exis/` folder.
-- **Instant Keyword RAG:** Built-in local search engine optimized for Russian grammar and verb stemming. It retrieves relevant user facts and injects them directly into your current prompt as context.
-<img src="https://github.com/examegd/EXis.Architect/blob/media/IMG_20260716-181129.png" width="400" alt="Описание картинки">
+<img src="https://github.com/examegd/EXis.Architect/blob/media/IMG_20260716-181129.png" width="400" alt="Local Memory Search">
+<img src="https://github.com/examegd/EXis.Architect/blob/media/IMG_20260716-181730.png" width="400" alt="Memory Diff">
 
-- **Active Memory Update Protocol:** After every response, a background AI model analyzes the dialogue and displays a green/red diff panel (`MEMORIAL_UPDATE_PROTOCOL`) asking to `COMMIT` or `ABORT` memory additions, updates, or deletions.
-<img src="https://github.com/examegd/EXis.Architect/blob/media/IMG_20260716-181730.png" width="400" alt="Example BD">
+### 6. Dual Search & Retrieval Drawer
+- **Web Retrieval:** Optional real-time web search powered by the Tavily API.
+- **Transparent Sources:** Accessed local memory blocks, search snippets, and Google Grounding references are displayed in an expandable `DATA_RETRIEVAL_LOG` with clickable URLs.
 
-
-
-### 5. Double Search & Sources Drawer (`DATA_RETRIEVAL_LOG`)
-- **Web Search Integration:** Toggle live web searches via Tavily API using the globe icon.
-- **Real-Time Sources:** If the model accesses local memories, Tavily results, or Google Grounding, a `DATA_RETRIEVAL_LOG` box displays the exact references, snippets, and clickable URLs that open in your default OS browser.
-<img src="https://github.com/examegd/EXis.Architect/blob/media/IMG_20260716-181129.png" width="400" alt="Example search">
-
-### 6. Additional Quality of Life Enhancements
-- **Model Compiler (1-Click Creator):** Choose `[ CREATE_MODEL... ]` from the models dropdown to open a modal where you can select a local `.gguf` file and compile a new model as a background process.
-- **Abort Stream (`STOP`):** While generating, the send button turns into a red `STOP` button. Clicking it triggers an `AbortController` signal to stop the local/cloud stream and release CPU resources.
-- **Clean Monospace Analytics:** Displays real-time CPU/RAM hardware stats in the header (pulled directly from Rust `sysinfo`), along with real-time generation speed (T/S) calculations.
----
-### 7. API Compatibility & External Integrations
-- **Standard API Support:** The backend maintains compatibility with the standard Ollama REST API. You can easily interact with your local models using custom scripts (e.g., Python `requests`, Node.js, or `curl`) by simply routing your requests to port `11500`.
-- **Ecosystem Compatibility:** Integrates with third-party tools, frameworks, and orchestration libraries that natively support Ollama (such as LangChain, LlamaIndex, or AutoGen) by pointing them to the custom port.
-- **Remote Deployment Capable:** Because the engine is built on a Go/C++ core, it can be compiled and run as a standalone backend service on remote servers (VPS/VDS). This allows you to offload heavy computation and use the backend as a private, centralized API endpoint.
-
-## 🛠️ Technical Architecture
-
-- **Backend:** Go, C++ (`llama.cpp` integration), CMake, MSVC/MSYS2 compilers.
-- **Frontend / Window Wrapper:** Rust (Tauri v2), leveraging native Windows WebView2 transparency and file system management.
-- **UI Code:** React, Svelte, or TypeScript, utilizing CSS Glassmorphism and hardware-accelerated CSS transition layouts.
+### 7. Core Ergonomics
+- **Model Compiler:** Create models from arbitrary local `.gguf` files via `[ CREATE_MODEL... ]`.
+- **Generation Control:** Dedicated abort mechanism issuing an `AbortController` signal to immediately halt model generation and release allocated threads.
+- **Real-Time Diagnostics:** Monospace header monitoring CPU and RAM utilization (via Rust `sysinfo`) and live tokens-per-second (T/S) generation speed.
 
 ---
 
-## 🔧 Installation & Build
+### 8. API Compatibility
+- **Ollama REST API (Port 11500):** Compatible with standard scripts, LangChain, LlamaIndex, or AutoGen configured to target port `11500`.
+- **OpenAI REST API (Port 11600):** ExisQuant server accepts requests formatted for OpenAI endpoints (`/v1/chat/completions`).
+- **Headless Server Deployment:** Backend components can be compiled independently to run as a remote compute service on dedicated Linux/Windows servers.
+
+---
+
+## Technical Architecture
+
+- **Backend (exis):** Go, C++ (`llama.cpp`), CMake, MSVC/MSYS2.
+- **Inference Engine (ExisQuant):** Rust, CUDA C++, Tensor Core WMMA.
+- **Desktop Host:** Rust (Tauri v2), Windows WebView2.
+- **Frontend UI:** React, TypeScript, CSS Glassmorphism.
+
+---
+
+## Installation & Build
 
 ### Prerequisites
-To build both components from source, you will need:
 - **Go** (1.22+)
 - **CMake** (3.24+) and C++ compilers (Visual Studio Build Tools / MSYS2)
+- **CUDA Toolkit** (12.0+ for ExisQuant CUDA compilation)
+- **Rust & Cargo**
 - **Node.js** (LTS)
-- **Rust / Cargo** (via rustup)
 
-### Compiling the Backend (`exis.exe`)
-1. Clone the backend repository and navigate to its folder.
-2. Build the C++ llama-server dependencies:
-   ```powershell
-   cmake -B build .
-   cmake --build build --parallel 8
-   ```
-3. Build the Go binary:
-   ```powershell
-   go build -o exis.exe .
-   ```
+### Building the Backend (`exis.exe`)
+```powershell
+# 1. Build C++ server dependencies
+cmake -B build .
+cmake --build build --parallel 8
 
-### Compiling the UI & Packaging the Installer
-1. Navigate to the `EXis.Architect` project folder.
-2. Copy your compiled `exis.exe` and the `lib/ollama/` folder from `exis-backend` into `src-tauri/binaries/` (so that the structure is `src-tauri/binaries/exis.exe` and `src-tauri/binaries/lib/ollama/llama-server.exe`).
-3. Install Node packages and build the final NSIS `.exe` installer:
-   ```powershell
-   npm install
-   npm run tauri build
-   ```
-4. Find your ready-to-use installer inside `src-tauri/target/release/bundle/nsis/exis-architect_1.0.0_x64-setup.exe`.
-
----
-
-## 📜 Credits & Attribution
-
-- **Backend Engine:** The core `exis.exe` local server and C++ model runners are based on a modified, custom fork of the open-source **[Ollama](https://github.com/ollama/ollama)** project (MIT License). Thanks to the Ollama team and community for building such a robust foundation.
-- **Frontend & Integrations:** The custom Tauri/React desktop frame, tactical HUD overlays, Active Memory DB, system monitors, stream parsing, and custom styling were designed and developed by **examegd**.
-
----
-
-## 🛡️ License
-
-`exis.Architect` is licensed under the **GNU GPLv3 (General Public License v3)**. 
-- You are free to read, modify, and redistribute this software.
-- Any modified versions or derivative works of this application **must** remain open-source and be distributed under the same GPLv3 license for free.
-- Original copyright notices and author attributions must be preserved.
+# 2. Build Go executable
+go build -o exis.exe .
 ```
+
+### Packaging the Desktop App
+1. Move `exis.exe` and the `lib/ollama/` directory into `src-tauri/binaries/` (resulting in `src-tauri/binaries/exis.exe` and `src-tauri/binaries/lib/ollama/llama-server.exe`).
+2. Install frontend dependencies and run the Tauri bundler:
+```powershell
+npm install
+npm run tauri build
+```
+3. The generated NSIS installer will be located at:
+   `src-tauri/target/release/bundle/nsis/exis-architect_1.0.0_x64-setup.exe`
+
+---
+
+## Credits & Attribution
+
+- **Ollama Engine:** `exis.exe` is derived from the open-source **[Ollama](https://github.com/ollama/ollama)** project (MIT License).
+- **Frontend & Runtime Integration:** Desktop UI, ExisQuant engine, Tactical HUD overlay, Active Memory subsystem, and diagnostic integrations developed by **examegd**.
+
+---
+
+## License
+
+Distributed under the **GNU General Public License v3 (GPLv3)**. Derived works and modifications must remain open-source under GPLv3 with original copyright notices retained.
