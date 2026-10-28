@@ -1,0 +1,12 @@
+exis-backend/*.go linguist-vendored
+exis-backend/**/*.go linguist-vendored
+exis-backend/*.c linguist-vendored
+exis-backend/**/*.c linguist-vendored
+exis-backend/*.h linguist-vendored
+exis-backend/**/*.h linguist-vendored
+*.rs linguist-language=Rust
+*.cu linguist-language=CUDA
+*.cuh linguist-language=CUDA
+*.cpp linguist-language=C++
+*.hpp linguist-language=C++
+* text=auto
