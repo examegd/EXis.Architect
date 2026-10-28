@@ -1,5 +1,0 @@
-exis-backend/** linguist-vendored
-*.rs linguist-language=Rust
-*.cu linguist-language=CUDA
-*.cuh linguist-language=CUDA
-* text=auto
