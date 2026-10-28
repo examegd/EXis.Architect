@@ -1,3 +1,8 @@
+src/components/** linguist-vendored
+src/pages/** linguist-vendored
+*.css linguist-vendored
+*.ps1 linguist-vendored
+Dockerfile linguist-vendored
 *.mdx linguist-documentation=true
 *.md linguist-documentation=true
 exis-backend/*.go linguist-vendored
