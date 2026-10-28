@@ -1,9 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import { invoke, convertFileSrc } from "@tauri-apps/api/core";
+import { invoke, Channel } from "@tauri-apps/api/core";
 import "./App.css";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-
-
 const handleOpenLink = async (url: string) => {
   try {
     await open(url);
@@ -17,14 +15,12 @@ interface Source {
   url?: string;
   snippet?: string;
 }
-
 interface Memory {
   id: string;
   text: string;
   tags: string[];
   timestamp: string;
 }
-
 interface ProposedChange {
   action: "add" | "update" | "delete" | "none";
   addText?: string;
@@ -32,7 +28,6 @@ interface ProposedChange {
   deleteText?: string;
   tags?: string[];
 }
-
 interface Message {
   id: number;
   sender: "user" | "assistant";
@@ -42,20 +37,14 @@ interface Message {
   sources?: Source[];
   image?: string;
 }
-
-
 interface ExisDB {
   memories: Memory[];
 }
-
-
 interface Chat {
   id: string;
   title: string;
   messages: Message[];
 }
-
-
 function PrecursorGlyph() {
   return (
     <svg className="precursor-glyph" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -103,10 +92,8 @@ function PaperclipIcon() {
     </svg>
   );
 }
-
 function ThinkingBlock({ content }: { content: string }) {
   const [isOpen, setIsOpen] = useState(true);
-
   return (
     <div className="thinking-box">
       <div className="thinking-header" onClick={() => setIsOpen(!isOpen)}>
@@ -120,7 +107,6 @@ function ThinkingBlock({ content }: { content: string }) {
     </div>
   );
 }
-
 function SourcesGlyph() {
   return (
     <svg className="sources-glyph" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -134,14 +120,8 @@ function SourcesGlyph() {
     </svg>
   );
 }
-
-
 function SourcesBlock({ sources }: { sources: Source[] }) {
   const [isOpen, setIsOpen] = useState(false);
-
- 
- 
-
   return (
     <div className="sources-box">
       <div className="sources-header" onClick={() => setIsOpen(!isOpen)}>
@@ -158,7 +138,6 @@ function SourcesBlock({ sources }: { sources: Source[] }) {
               <span className="source-item-title">
                 {src.type === "db" ? "[DATABASE_MATCH]" : "[WEB_REFERENCE]"} {src.title}
               </span>
-              
               {}
               {src.url && (
                 <span 
@@ -168,7 +147,6 @@ function SourcesBlock({ sources }: { sources: Source[] }) {
                   {src.url}
                 </span>
               )}
-              
               {}
               {src.snippet && (
                 <div className="source-item-snippet">
@@ -182,7 +160,6 @@ function SourcesBlock({ sources }: { sources: Source[] }) {
     </div>
   );
 }
-
 function OverlayHUD({
   models,
   selectedModel,
@@ -193,7 +170,6 @@ function OverlayHUD({
   repeatPenalty,
   geminiApiKey,
   handleCaptureScreen,
- 
   throttleInBg,
   throttlePercent,
 }: {
@@ -207,7 +183,6 @@ function OverlayHUD({
   geminiApiKey: string;
   setIsCreateModelOpen: (b: boolean) => void;
   handleCaptureScreen: () => void;
- 
   throttleInBg: boolean;
   throttlePercent: number;
   presencePenalty: number;
@@ -221,8 +196,6 @@ function OverlayHUD({
   const [hudResponse, setHudResponse] = useState("");
   const [hudThinking, setHudThinking] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
-
- 
  const handleRestoreMain = async () => {
    try {
      await invoke("restore_main_window");
@@ -237,24 +210,18 @@ function OverlayHUD({
      console.error("Failed to exit application:", e);
    }
  };
- 
   const handleHudSend = async () => {
     if (!hudInput.trim() || isGenerating) return;
-
     const userText = hudInput;
     setHudInput("");
     setIsGenerating(true);
     setHudResponse("");
     setHudThinking("");
-
     const isGeminiModel = selectedModel.startsWith("gemini-");
-
     try {
       let response: Response;
-
       if (isGeminiModel) {
         if (!geminiApiKey.trim()) throw new Error("Missing Gemini API Key");
-
         response = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:streamGenerateContent?alt=sse&key=${geminiApiKey}`,
           {
@@ -279,7 +246,6 @@ function OverlayHUD({
             ],
             stream: true,
             options: {
-             
               num_thread: throttleInBg 
                 ? Math.max(1, Math.round(numThreads * (1 - throttlePercent / 100))) 
                 : numThreads,
@@ -289,30 +255,23 @@ function OverlayHUD({
           })
         });
       }
-
       if (!response.body) throw new Error("Empty body from API stream");
-
       const reader = response.body.getReader();
       const decoder = new TextDecoder("utf-8");
       let partialLine = "";
       let fullTextAccumulator = "";
       let thinkingAccumulator = "";
       let responseTextAccumulator = "";
-
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
-
         const chunk = decoder.decode(value, { stream: true });
         const lines = (partialLine + chunk).split("\n");
         partialLine = lines.pop() || "";
-
         for (const line of lines) {
           if (!line.trim()) continue;
-
           try {
             let token = "";
-
             if (isGeminiModel) {
               if (line.startsWith("data: ")) {
                 const jsonStr = line.slice(6).trim();
@@ -323,15 +282,11 @@ function OverlayHUD({
               const parsed = JSON.parse(line);
               token = parsed.message?.content || "";
             }
-
             fullTextAccumulator += token;
-
-           
             if (fullTextAccumulator.includes("<thinking>")) {
               const parts = fullTextAccumulator.split("<thinking>");
               const textBeforeThinking = parts[0];
               const rest = parts[1] || "";
-
               if (rest.includes("</thinking>")) {
                 const subParts = rest.split("</thinking>");
                 thinkingAccumulator = subParts[0];
@@ -343,16 +298,13 @@ function OverlayHUD({
             } else {
               responseTextAccumulator = fullTextAccumulator;
             }
-
             setHudThinking(thinkingAccumulator);
             setHudResponse(responseTextAccumulator);
-
           } catch (err) {
             console.error("Stream parse error:", err);
           }
         }
       }
-
     } catch (e) {
       console.error("HUD execution error:", e);
       setHudResponse("SYSTEM_ERROR: Failed to connect to core.");
@@ -360,7 +312,6 @@ function OverlayHUD({
       setIsGenerating(false);
     }
   };
-
   return (
     <div className="hud-window">
       {}
@@ -371,7 +322,6 @@ function OverlayHUD({
               <PrecursorGlyph />
               <span>TACTICAL_HUD_DIRECTIVE</span>
             </div>
-            
             {}
              <select
               className="model-select"
@@ -385,7 +335,6 @@ function OverlayHUD({
               ))}
             </select>
           </div>
-
           {}
           <textarea
             className="hud-input"
@@ -400,7 +349,6 @@ function OverlayHUD({
             }}
             disabled={isGenerating}
           />
-
           <div className="hud-actions">
             <button 
               className="hud-btn" 
@@ -413,7 +361,6 @@ function OverlayHUD({
               {isGenerating ? "..." : "EXECUTE"}
             </button>
           </div>
-
           {}
           {(hudThinking || hudResponse || isGenerating) && (
             <div className="hud-response-box">
@@ -428,7 +375,6 @@ function OverlayHUD({
           )}
         </div>
       )}
-
       {}
       <div className="hud-trigger-buttons">
        {}
@@ -440,7 +386,6 @@ function OverlayHUD({
        >
          ✕
        </button>
-
        {}
        <button 
          className="hud-trigger-circle" 
@@ -450,7 +395,6 @@ function OverlayHUD({
        >
          ⤢
        </button>
-
        {}
        <button 
          className="hud-trigger-circle" 
@@ -465,25 +409,17 @@ function OverlayHUD({
 }
 function renderMessageContent(text: string) {
   if (!text) return null;
-
- 
   const combinedRegex = /(!?\[.*?\]\(.*?\))/g;
   const elements: React.ReactNode[] = [];
   let lastIndex = 0;
   let match;
-
   while ((match = combinedRegex.exec(text)) !== null) {
     const matchIndex = match.index;
-    
-   
     if (matchIndex > lastIndex) {
       elements.push(<span key={`text-${lastIndex}`}>{text.substring(lastIndex, matchIndex)}</span>);
     }
-
     const token = match[0];
-    
     if (token.startsWith("![")) {
-     
       const imgMatch = /!\[(.*?)\]\((.*?)\)/.exec(token);
       if (imgMatch) {
         const alt = imgMatch[1];
@@ -498,18 +434,14 @@ function renderMessageContent(text: string) {
         );
       }
     } else if (token.startsWith("[")) {
-     
       const linkMatch = /\[(.*?)\]\((.*?)\)/.exec(token);
       if (linkMatch) {
         const label = linkMatch[1];
         const url = linkMatch[2];
-        
-       
         const isVideo = label.toLowerCase() === "video" || 
                         url.endsWith(".mp4") || 
                         url.endsWith(".webm") || 
                         url.endsWith(".ogg");
-
         if (isVideo) {
           elements.push(
             <video 
@@ -520,7 +452,6 @@ function renderMessageContent(text: string) {
             />
           );
         } else {
-         
           elements.push(
             <span 
               key={`link-${matchIndex}`} 
@@ -534,21 +465,28 @@ function renderMessageContent(text: string) {
         }
       }
     }
-
     lastIndex = combinedRegex.lastIndex;
   }
-
- 
   if (lastIndex < text.length) {
     elements.push(<span key={`text-${lastIndex}`}>{text.substring(lastIndex)}</span>);
   }
-
   return <div style={{ whiteSpace: "pre-wrap" }}>{elements.length > 0 ? elements : text}</div>;
 }
 export default function App() {
- 
-  
- 
+  const [computeDevice, setComputeDevice] = useState<string>(() => {
+    return localStorage.getItem("exis_compute_device") || "auto";
+  });
+  const [gpuName, setGpuName] = useState<string>("");
+  useEffect(() => {
+    localStorage.setItem("exis_compute_device", computeDevice);
+  }, [computeDevice]);
+  useEffect(() => {
+    invoke<any>("get_hardware_info").then((info) => {
+      if (info && info.has_cuda) {
+        setGpuName(info.gpu_name);
+      }
+    }).catch(console.error);
+  }, []);
   const [chats, setChats] = useState<Chat[]>(() => {
     const saved = localStorage.getItem("exis_chats");
     return saved ? JSON.parse(saved) : [
@@ -561,7 +499,6 @@ export default function App() {
           sender: "assistant",
           text: "exis.Architect link active. Core operational on port 11500. Select model and initialize instruction set.",
           thinking: "SYSTEM_SELF_TEST: OK\nPORT_11500: ACTIVE\nSYNCHRONIZING_MODEL_REGISTRY...",
-         
           sources: [
             { 
               type: "db", 
@@ -570,8 +507,8 @@ export default function App() {
             },
             {
               type: "web",
-              title: "Subnautica Wiki - Precursor Technology",
-              url: "https://subnautica.fandom.com/wiki/Precursor_Technology",
+              title: "AnarchyBox",
+              url: "https://thunderstore.io/c/repo/p/examegd/AnarchyBox/",
               snippet: "Information regarding the Architects' high-tech energy structures and ion crystal matrix cores."
             }
           ]
@@ -580,55 +517,44 @@ export default function App() {
       }
     ];
   });
-
- 
   const [systemPrompt, setSystemPrompt] = useState<string>(() => {
     const saved = localStorage.getItem("exis_system_prompt");
-    return saved || "You are exis.Architect. You must ALWAYS start your response with a detailed, step-by-step thinking process wrapped inside <thinking>...</thinking> tags, followed by your final answer outside the tags. Write your response in Russian.";
+    return saved || "You are exis.Architect.";
   });
-
   const [numThreads, setNumThreads] = useState<number>(() => {
     const saved = localStorage.getItem("exis_num_threads");
     return saved ? Math.max(1, parseInt(saved, 10)) : 4; 
   });
-
   const [temperature, setTemperature] = useState<number>(() => {
     const saved = localStorage.getItem("exis_temperature");
     return saved ? Math.min(2, Math.max(0, parseFloat(saved))) : 0.7;
   });
-
   const [repeatPenalty, setRepeatPenalty] = useState<number>(() => {
     const saved = localStorage.getItem("exis_repeat_penalty");
     return saved ? Math.max(0, parseFloat(saved)) : 1.1;
   });
-
   const [numCtx, setNumCtx] = useState<number>(() => {
     const saved = localStorage.getItem("exis_num_ctx");
     return saved ? Math.max(512, parseInt(saved, 10)) : 4096;
   });
-
   const [topP, setTopP] = useState<number>(() => {
     const saved = localStorage.getItem("exis_top_p");
     return saved ? Math.min(1, Math.max(0, parseFloat(saved))) : 0.9;
   });
-
   const [topK, setTopK] = useState<number>(() => {
     const saved = localStorage.getItem("exis_top_k");
     return saved ? Math.max(1, parseInt(saved, 10)) : 40;
   });
-
   const [presencePenalty, setPresencePenalty] = useState<number>(() => {
     const saved = localStorage.getItem("exis_presence_penalty");
     return saved ? Math.max(0, parseFloat(saved)) : 0.0;
   });
-
   const [frequencyPenalty, setFrequencyPenalty] = useState<number>(() => {
     const saved = localStorage.getItem("exis_frequency_penalty");
     return saved ? Math.max(0, parseFloat(saved)) : 0.0;
   });
   const [newMemoryText, setNewMemoryText] = useState("");
   const [newMemoryTags, setNewMemoryTags] = useState("");
- 
   const [isWebSearchEnabled, setIsWebSearchEnabled] = useState<boolean>(() => {
     const saved = localStorage.getItem("exis_web_search_enabled");
     return saved === "true";
@@ -637,7 +563,6 @@ export default function App() {
     const saved = localStorage.getItem("exis_throttle_in_bg");
     return saved ? saved === "true" : true;
   });
-
   useEffect(() => {
     localStorage.setItem("exis_throttle_in_bg", throttleInBg.toString());
   }, [throttleInBg]);
@@ -645,8 +570,6 @@ export default function App() {
     const saved = localStorage.getItem("exis_throttle_percent");
     return saved ? parseInt(saved, 10) : 50;
   });
-
- 
   useEffect(() => {
     localStorage.setItem("exis_throttle_percent", throttlePercent.toString());
   }, [throttlePercent]);
@@ -657,29 +580,22 @@ export default function App() {
     const saved = localStorage.getItem("exis_use_search_grounding");
     return saved === "true";
   });
-
   useEffect(() => {
     localStorage.setItem("exis_use_search_grounding", useSearchGrounding.toString());
   }, [useSearchGrounding]);
- 
   const [geminiApiKey, setGeminiApiKey] = useState<string>(() => {
     return localStorage.getItem("exis_gemini_api_key") || "";
   });
   const [windowLabel, setWindowLabel] = useState<string>("main");
-
   useEffect(() => {
     const label = getCurrentWindow().label;
     setWindowLabel(label);
-
-   
-   
     if (label === "overlay") {
       const targets = [
         document.documentElement,
         document.body,
         document.getElementById("root")
       ];
-      
       targets.forEach((el) => {
         if (el) {
           el.style.setProperty("background", "transparent", "important");
@@ -688,16 +604,12 @@ export default function App() {
       });
     }
   }, []);
- 
   useEffect(() => {
     localStorage.setItem("exis_tavily_api_key", tavilyApiKey);
   }, [tavilyApiKey]);
-
- 
   useEffect(() => {
     localStorage.setItem("exis_web_search_enabled", isWebSearchEnabled.toString());
   }, [isWebSearchEnabled]);
-
   useEffect(() => {
     localStorage.setItem("exis_tavily_api_key", tavilyApiKey);
   }, [tavilyApiKey]);
@@ -706,28 +618,21 @@ export default function App() {
   }, [geminiApiKey]);
 const handleAddMemory = async () => {
     if (!newMemoryText.trim()) return;
-
-   
     const tagsArray = newMemoryTags
       .split(",")
       .map((t) => t.trim())
       .filter((t) => t.length > 0);
-
     const newMemory: Memory = {
       id: `mem-${Date.now()}`,
       text: newMemoryText,
       tags: tagsArray,
       timestamp: new Date().toISOString()
     };
-
     const updatedDB: ExisDB = {
       memories: [...exisDB.memories, newMemory]
     };
-
     try {
-     
       await invoke("write_exis_db", { data: JSON.stringify(updatedDB) });
-      
       setExisDB(updatedDB);
       setNewMemoryText("");
       setNewMemoryTags("");
@@ -735,8 +640,6 @@ const handleAddMemory = async () => {
       console.error("Failed to write exisdb.json through Rust:", e);
     }
   };
-
- 
   const [cpuUsage, setCpuUsage] = useState<number>(0);
   const [exisDB, setExisDB] = useState<ExisDB>({ memories: [] });
   const [ramUsage, setRamUsage] = useState<number>(0);
@@ -757,35 +660,25 @@ const handleAddMemory = async () => {
   const [newModelGgufPath, setNewModelGgufPath] = useState("");
   const [isCreatingModel, setIsCreatingModel] = useState(false);
   const [createModelError, setCreateModelError] = useState("");
-
- 
   const [scannerImage, setScannerImage] = useState<string | null>(null);
   const [cropStart, setCropStart] = useState<{ x: number; y: number } | null>(null);
   const [cropCurrent, setCropCurrent] = useState<{ x: number; y: number } | null>(null);
- 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-   
     if (!file.type.startsWith("image/")) {
       alert("exis.Architect currently only supports image processing (PNG/JPG). Audio and video analysis is not supported by the active model.");
       return;
     }
-
     const reader = new FileReader();
     reader.onload = () => {
       const result = reader.result as string;
       setImagePreview(result);
-      
-     
       const base64Data = result.split(",")[1];
       setAttachedImage(base64Data);
     };
     reader.readAsDataURL(file);
   };
-
- 
   const handleRemoveImage = () => {
     setAttachedImage(null);
     setImagePreview(null);
@@ -796,15 +689,9 @@ const handleAddMemory = async () => {
   const [activeChatId, setActiveChatId] = useState<string>(() => {
     return chats[0]?.id || "chat-1";
   });
-
-
-
   const activeChat = chats.find((c) => c.id === activeChatId) || chats[0];
   const chatEndRef = useRef<HTMLDivElement>(null);
- 
   const lastScrollTimeRef = useRef<number>(0);
-
- 
   useEffect(() => {
     localStorage.setItem("exis_chats", JSON.stringify(chats));
   }, [chats]);
@@ -824,28 +711,21 @@ const handleAddMemory = async () => {
   useEffect(() => {
     localStorage.setItem("exis_system_prompt", systemPrompt);
   }, [systemPrompt]);
-
   useEffect(() => {
     localStorage.setItem("exis_num_ctx", numCtx.toString());
   }, [numCtx]);
-
   useEffect(() => {
     localStorage.setItem("exis_top_p", topP.toString());
   }, [topP]);
-
   useEffect(() => {
     localStorage.setItem("exis_top_k", topK.toString());
   }, [topK]);
-
   useEffect(() => {
     localStorage.setItem("exis_presence_penalty", presencePenalty.toString());
   }, [presencePenalty]);
-
   useEffect(() => {
     localStorage.setItem("exis_frequency_penalty", frequencyPenalty.toString());
   }, [frequencyPenalty]);
-
- 
   useEffect(() => {
     const interval = setInterval(() => {
       invoke<[number, number]>("get_system_stats")
@@ -857,13 +737,15 @@ const handleAddMemory = async () => {
           console.error("Failed to fetch system stats from Rust:", err);
         });
     }, 1000);
-
     return () => clearInterval(interval);
   }, []);
-
- 
-  useEffect(() => {
-   
+useEffect(() => {
+    invoke<string[]>("list_exiq_models").then((exiqList) => {
+      if (exiqList && exiqList.length > 0) {
+        setModels((prev) => Array.from(new Set([...prev, ...exiqList])));
+        if (!selectedModel) setSelectedModel(exiqList[0]);
+      }
+    }).catch(console.error);
     fetch("http://127.0.0.1:11500/api/tags")
       .then((res) => res.json())
       .then(async (localData: any) => {
@@ -871,92 +753,39 @@ const handleAddMemory = async () => {
         if (localData.models && localData.models.length > 0) {
           modelNames = localData.models.map((m: any) => m.name);
         }
-
-       
         if (geminiApiKey.trim().length > 0) {
           try {
             const googleRes = await fetch(
               `https://generativelanguage.googleapis.com/v1beta/models?key=${geminiApiKey}`
             );
             const googleData = await googleRes.json();
-            
-            if (googleData.models && googleData.models.length > 0) {
-             
-             
+            if (googleData.models) {
               const geminiModels = googleData.models
-                .filter((m: any) => 
-                  m.name.includes("gemini") && 
-                  m.supportedGenerationMethods.includes("generateContent")
-                )
-               
+                .filter((m: any) => m.name.includes("gemini") && m.supportedGenerationMethods.includes("generateContent"))
                 .map((m: any) => m.name.replace("models/", ""));
-
-             
               modelNames = [...modelNames, ...geminiModels];
             }
-          } catch (googleErr) {
-            console.error("Failed to fetch dynamic Gemini models:", googleErr);
-           
-            modelNames.push("gemini-1.5-flash", "gemini-2.0-flash");
+          } catch (e) {
+            console.error("Gemini load error:", e);
           }
         }
-
-        setModels(modelNames);
-        if (modelNames.length > 0 && !selectedModel) {
-          setSelectedModel(modelNames[0]);
-        }
+        setModels((prev) => Array.from(new Set([...prev, ...modelNames])));
       })
-      .catch(async (err) => {
-        console.warn("exis.exe server not found. Checking cloud models...", err);
-        let fallbackModels: string[] = ["qwen2.5:1.5b", "deepseek-r1:7b"];
-
-       
-        if (geminiApiKey.trim().length > 0) {
-          try {
-            const googleRes = await fetch(
-              `https://generativelanguage.googleapis.com/v1beta/models?key=${geminiApiKey}`
-            );
-            const googleData = await googleRes.json();
-            if (googleData.models && googleData.models.length > 0) {
-              const geminiModels = googleData.models
-                .filter((m: any) => 
-                  m.name.includes("gemini") && 
-                  m.supportedGenerationMethods.includes("generateContent")
-                )
-                .map((m: any) => m.name.replace("models/", ""));
-              
-              fallbackModels = geminiModels;
-            }
-          } catch (googleErr) {
-            fallbackModels.push("gemini-1.5-flash", "gemini-2.0-flash");
-          }
-        }
-
-        setModels(fallbackModels);
-        if (fallbackModels.length > 0 && !selectedModel) {
-          setSelectedModel(fallbackModels[0]);
-        }
+      .catch((err) => {
+        console.warn("exis.exe server offline", err);
       });
   }, [geminiApiKey]);
-
- 
   useEffect(() => {
     const now = Date.now();
-    
     if (isGenerating) {
-     
-     
       if (now - lastScrollTimeRef.current > 150) {
         chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
         lastScrollTimeRef.current = now;
       }
     } else {
-     
       chatEndRef.current?.scrollIntoView({ behavior: "auto" });
     }
   }, [activeChat.messages, isGenerating]);
-
- 
   const handleCreateNewChat = () => {
     const newId = `chat-${Date.now()}`;
     const newChat: Chat = {
@@ -976,78 +805,55 @@ const handleAddMemory = async () => {
   };
     const handleDeleteChat = (id: string) => {
     if (chats.length <= 1) return;
-
     setChats((prev) => {
       const filtered = prev.filter((c) => c.id !== id);
-     
       if (activeChatId === id) {
         setActiveChatId(filtered[0].id);
       }
       return filtered;
     });
   };
-
- 
-  const handleAbortGeneration = () => {
+const handleAbortGeneration = () => {
+    invoke("abort_exiq_generation").catch(console.error);
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
-      setIsGenerating(false);
       abortControllerRef.current = null;
     }
+    setIsGenerating(false);
   };
   const retrieveMemories = (query: string, memories: Memory[]): Memory[] => {
     const words = query
       .toLowerCase()
       .replace(/[^a-zA-Zа-яА-Я0-9\s]/g, "")
       .split(/\s+/)
-     
       .filter((w) => w.length > 2)
-     
       .map((w) => (w.length > 4 ? w.slice(0, 4) : w));
-
     if (words.length === 0) return [];
-
     return memories.filter((mem) => {
       const memTextLower = mem.text.toLowerCase();
-
-     
       const textMatch = words.some((word) => memTextLower.includes(word));
-      
-     
       const tagMatch = mem.tags.some((tag) => 
         words.some((word) => tag.toLowerCase().includes(word))
       );
-
       return textMatch || tagMatch;
     });
   };
- 
-  const handleSend = async () => {
+const handleSend = async () => {
     if (!inputValue.trim() || isGenerating) return;
-
- if (!inputValue.trim() || isGenerating) return;
-
-   
     const controller = new AbortController();
     abortControllerRef.current = controller;
     const userText = inputValue;
     setInputValue("");
     setIsGenerating(true);
-
     const userMessageId = Date.now();
     const newUserMessage: Message = {
       id: userMessageId,
       sender: "user",
       text: userText,
-     
       image: imagePreview || undefined 
     };
-
-   
     const imageToSend = attachedImage; 
     handleRemoveImage();
-
-   
     setChats((prevChats) =>
       prevChats.map((c) => {
         if (c.id === activeChatId) {
@@ -1056,15 +862,9 @@ const handleAddMemory = async () => {
         return c;
       })
     );
-
-   
     const matchedMemories = retrieveMemories(userText, exisDB.memories);
-    
-   
     const messageSources: Source[] = [];
     let activeMessageSources: Source[] = [];
-
-   
     if (matchedMemories.length > 0) {
       matchedMemories.forEach((m) => {
         messageSources.push({
@@ -1074,92 +874,62 @@ const handleAddMemory = async () => {
         });
       });
     } 
-
-   
     let webSearchContext = "";
-
-    if (isWebSearchEnabled && tavilyApiKey) {
+    if (isWebSearchEnabled && tavilyApiKey.trim()) {
       try {
-        const searchResponse = await fetch("https://api.tavily.com/search", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            api_key: tavilyApiKey,
-            query: userText,
-            search_depth: "basic",
-            max_results: 3
-          })
+        const searchData = await invoke<any>("search_tavily", {
+          apiKey: tavilyApiKey.trim(),
+          query: userText
         });
-
-        const searchData = await searchResponse.json();
         if (searchData.results && searchData.results.length > 0) {
           const snippets: string[] = [];
-          
           searchData.results.forEach((res: any) => {
             messageSources.push({
               type: "web",
-              title: res.title,
+              title: res.title || "Web Source",
               url: res.url,
               snippet: res.content
             });
-            
-            snippets.push(`- [${res.title}](${res.url}): ${res.content}`);
+            snippets.push(`- Источник [${res.title}](${res.url}): ${res.content}`);
           });
-
           webSearchContext = snippets.join("\n");
         }
-      } catch (e) {
+      } catch (e: any) {
         console.error("Web search execution failed:", e);
+        alert(`Ошибка поиска Tavily:\n${e}`);
       }
     }
     activeMessageSources = [...messageSources];
-   
     const formattedHistory = [
       { role: "system", content: systemPrompt }
     ];
-
     activeChat.messages.forEach((m) => {
       formattedHistory.push({
         role: m.sender === "user" ? "user" : "assistant",
         content: m.text,
-       
         images: m.image ? [m.image.split(",")[1]] : undefined
       } as any);
     });
-
-   
     let finalUserMessageContent = userText;
     let injectedContext = "";
-
     if (matchedMemories.length > 0) {
-      const memoryContext = matchedMemories
-        .map((m) => `- ${m.text}`)
-        .join("\n");
+      const memoryContext = matchedMemories.map((m) => `- ${m.text}`).join("\n");
       injectedContext += `### LOCAL_DATABASE_RECORDS:\n${memoryContext}\n\n`;
     }
-
     if (webSearchContext) {
       injectedContext += `### LIVE_WEB_SEARCH_RESULTS:\n${webSearchContext}\n\n`;
     }
-
     if (injectedContext) {
       finalUserMessageContent = `[SYSTEM_RETRIEVED_CONTEXT: You MUST use the following verified local database records and live web search results to construct an accurate, up-to-date response in Russian. If the search results do not contain the answer, ignore this block. Context:\n\n${injectedContext}]\n\nMy Question: ${userText}`;
     }
-
-   
     const lastUserMsgPayload: any = {
       role: "user",
       content: finalUserMessageContent
     };
-
-   
     if (imageToSend) {
       lastUserMsgPayload.images = [imageToSend];
     }
-
-   
     formattedHistory.push(lastUserMsgPayload);
-
     const assistantMessageId = Date.now() + 1;
     const initialAssistantMessage: Message = {
       id: assistantMessageId,
@@ -1168,7 +938,6 @@ const handleAddMemory = async () => {
       thinking: "",
       sources: activeMessageSources.length > 0 ? activeMessageSources : undefined
     };
-
     setChats((prevChats) =>
       prevChats.map((c) => {
         if (c.id === activeChatId) {
@@ -1177,17 +946,76 @@ const handleAddMemory = async () => {
         return c;
       })
     );
-
     try {
       const isGeminiModel = selectedModel.startsWith("gemini-");
+      const isExiqModel = selectedModel.startsWith("exiq:");
+      //exiq
+      if (isExiqModel) {
+        const tokenChannel = new Channel<string>();
+        let fullText = "";
+        let genStartTime = 0;
+        let tokenCount = 0;
+        let finalSpeed = 0;
+        tokenChannel.onmessage = (token: string) => {
+          if (tokenCount === 0) {
+            genStartTime = Date.now();
+          }
+          fullText += token;
+          tokenCount++;
+          const elapsed = (Date.now() - genStartTime) / 1000;
+          if (elapsed > 0.3) {
+            finalSpeed = tokenCount / elapsed;
+          }
+          setChats((prevChats) =>
+            prevChats.map((c) => {
+              if (c.id === activeChatId) {
+                return {
+                  ...c,
+                  messages: c.messages.map((m) => {
+                    if (m.id === assistantMessageId) {
+                      return {
+                        ...m,
+                        text: fullText,
+                        speed: finalSpeed > 0 ? finalSpeed : undefined
+                      };
+                    }
+                    return m;
+                  })
+                };
+              }
+              return c;
+            })
+          );
+        };
+        let chatPrompt = `<|im_start|>system\n${systemPrompt} Отвечай строго на русском языке.<|im_end|>\n`;
+        activeChat.messages.forEach((m) => {
+          if (m.id !== 1 && m.text.trim()) { 
+            chatPrompt += `<|im_start|>${m.sender}\n${m.text}<|im_end|>\n`;
+          }
+        });
+        chatPrompt += `<|im_start|>user\n${finalUserMessageContent}<|im_end|>\n<|im_start|>assistant\n`;
+        await invoke("run_exiq_chat", {
+          modelName: selectedModel,
+          prompt: chatPrompt,
+          maxTokens: 1024,
+          contextSize: numCtx || 4096,
+          temperature: temperature,
+          topP: topP,
+          repeatPenalty: repeatPenalty,
+          numThreads: numThreads,
+          device: computeDevice || "auto",
+          isNewChat: false,
+          onToken: tokenChannel
+        });
+        setIsGenerating(false); 
+        return;
+      }
+      //cloud
       let response: Response;
-
-     
       if (isGeminiModel) {
         if (!geminiApiKey.trim()) {
           throw new Error("Gemini API Key is missing. Please add it in Core Settings.");
         }
-
         const geminiContents = activeChat.messages.map((m) => {
           const parts: any[] = [{ text: m.text }];
           if (m.image) {
@@ -1204,7 +1032,6 @@ const handleAddMemory = async () => {
             parts: parts
           };
         });
-
         const lastMsgParts: any[] = [{ text: finalUserMessageContent }];
         if (imageToSend) {
           lastMsgParts.push({
@@ -1218,8 +1045,6 @@ const handleAddMemory = async () => {
           role: "user",
           parts: lastMsgParts
         });
-
-       
         const geminiRequestBody: any = {
           contents: geminiContents,
           systemInstruction: {
@@ -1229,16 +1054,9 @@ const handleAddMemory = async () => {
             temperature: temperature
           }
         };
-
-       
         if (useSearchGrounding) {
-          geminiRequestBody.tools = [
-            {
-              googleSearch: {}
-            }
-          ];
+          geminiRequestBody.tools = [{ googleSearch: {} }];
         }
-
         response = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:streamGenerateContent?alt=sse&key=${geminiApiKey}`,
           {
@@ -1249,7 +1067,7 @@ const handleAddMemory = async () => {
           }
         );
       }
-     
+      //exis.exe(gguf)
       else {
         response = await fetch("http://127.0.0.1:11500/api/chat", {
           method: "POST",
@@ -1272,94 +1090,68 @@ const handleAddMemory = async () => {
           })
         });
       }
-
       if (!response.body) {
         throw new Error("Empty body from API stream");
       }
-
-     
       const reader = response.body.getReader();
       const decoder = new TextDecoder("utf-8");
       let partialLine = "";
-      
       let fullTextAccumulator = "";
       let thinkingAccumulator = "";
       let responseTextAccumulator = "";
       let calculatedSpeed = 0;
       const startTime = Date.now();
       let tokenCount = 0;
-
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
-
         const chunk = decoder.decode(value, { stream: true });
         const lines = (partialLine + chunk).split("\n");
         partialLine = lines.pop() || "";
-
         for (const line of lines) {
           if (!line.trim()) continue;
-
           try {
             let token = "";
-
-           
-if (isGeminiModel) {
-           if (line.startsWith("data: ")) {
-             const jsonStr = line.slice(6).trim();
-             const parsed = JSON.parse(jsonStr);
-             
-             token = parsed.candidates?.[0]?.content?.parts?.[0]?.text || "";
-             tokenCount++;
-             
-             const elapsedSeconds = (Date.now() - startTime) / 1000;
-             calculatedSpeed = tokenCount / elapsedSeconds;
-
-            
-             const grounding = parsed.candidates?.[0]?.groundingMetadata;
-             if (grounding && grounding.groundingChunks && grounding.groundingChunks.length > 0) {
-               const googleSources: Source[] = [];
-               
-               grounding.groundingChunks.forEach((chunk: any) => {
-                 if (chunk.web && chunk.web.uri) {
-                   googleSources.push({
-                     type: "web",
-                     title: chunk.web.title || "Google Search Reference",
-                     url: chunk.web.uri,
-                     snippet: "Verified real-time Google search source"
-                   });
-                 }
-               });
-
-               if (googleSources.length > 0) {
-                
-                 activeMessageSources = [...messageSources, ...googleSources];
-               }
-             }
-           }
-         }
-           
-            else {
+            if (isGeminiModel) {
+              if (line.startsWith("data: ")) {
+                const jsonStr = line.slice(6).trim();
+                const parsed = JSON.parse(jsonStr);
+                token = parsed.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                tokenCount++;
+                const elapsedSeconds = (Date.now() - startTime) / 1000;
+                calculatedSpeed = tokenCount / elapsedSeconds;
+                const grounding = parsed.candidates?.[0]?.groundingMetadata;
+                if (grounding && grounding.groundingChunks && grounding.groundingChunks.length > 0) {
+                  const googleSources: Source[] = [];
+                  grounding.groundingChunks.forEach((chunk: any) => {
+                    if (chunk.web && chunk.web.uri) {
+                      googleSources.push({
+                        type: "web",
+                        title: chunk.web.title || "Google Search Reference",
+                        url: chunk.web.uri,
+                        snippet: "Verified real-time Google search source"
+                      });
+                    }
+                  });
+                  if (googleSources.length > 0) {
+                    activeMessageSources = [...messageSources, ...googleSources];
+                  }
+                }
+              }
+            } else {
               const parsed = JSON.parse(line);
-              
               if (parsed.done && parsed.eval_count && parsed.eval_duration) {
                 const count = parsed.eval_count;
                 const durationNs = parsed.eval_duration;
                 calculatedSpeed = count / (durationNs / 1e9);
               }
-
               token = parsed.message?.content || "";
             }
-
-           
             fullTextAccumulator += token;
-
-           
             if (fullTextAccumulator.includes("<thinking>")) {
               const parts = fullTextAccumulator.split("<thinking>");
               const textBeforeThinking = parts[0];
               const rest = parts[1] || "";
-
               if (rest.includes("</thinking>")) {
                 const subParts = rest.split("</thinking>");
                 thinkingAccumulator = subParts[0];
@@ -1372,7 +1164,6 @@ if (isGeminiModel) {
               const parts = fullTextAccumulator.split("<thought>");
               const textBeforeThinking = parts[0];
               const rest = parts[1] || "";
-
               if (rest.includes("</thought>")) {
                 const subParts = rest.split("</thought>");
                 thinkingAccumulator = subParts[0];
@@ -1384,8 +1175,6 @@ if (isGeminiModel) {
             } else {
               responseTextAccumulator = fullTextAccumulator;
             }
-
-           
             setChats((prevChats) =>
               prevChats.map((c) => {
                 if (c.id === activeChatId) {
@@ -1407,13 +1196,11 @@ if (isGeminiModel) {
                 return c;
               })
             );
-
           } catch (err) {
             console.error("Failed to parse stream line:", err);
           }
         }
       }
-
     } catch (error) {
       console.error("Generation error:", error);
       setChats((prevChats) =>
@@ -1425,7 +1212,7 @@ if (isGeminiModel) {
                 if (m.id === assistantMessageId) {
                   return {
                     ...m,
-                    text: "SYSTEM_ERROR: Connection with exis.exe lost. Verify backend state."
+                    text: `SYSTEM_ERROR: ${error}`
                   };
                 }
                 return m;
@@ -1438,8 +1225,6 @@ if (isGeminiModel) {
     } finally {
       setIsGenerating(false);
       abortControllerRef.current = null;
-     
-     
       triggerMemoryExtractor(userText, matchedMemories);
     }
   };
@@ -1447,25 +1232,19 @@ const triggerMemoryExtractor = async (userInput: string, activeMemories: Memory[
     const dbContext = activeMemories
       .map((m) => `ID: "${m.id}", Text: "${m.text}", Tags: ${m.tags.join(",")}`)
       .join("\n");
-
     const prompt = `You are the memory manager for exis.Architect. Your job is to analyze the User's input and determine if it contains a new personal fact to remember, updates/appends to an existing stored fact, or deletes a fact.
-
 Current Database Facts:
 ${dbContext || "No current facts."}
-
 User Input: "${userInput}"
-
 CRITICAL RULES FOR "none" (DO NOT TRIGGER ON CASUAL CHAT!):
 - If the User's input is a question, you MUST set "action" to "none".
 - If the User is just greeting you or saying short reactions like "ok", "cool", "привет", "ага", "ясно", you MUST set "action" to "none".
 - ONLY set "action" to "add" or "update" if the user is EXPLICITLY stating a new concrete, permanent personal fact about themselves.
-
 RULES FOR UPDATE/APPEND:
 - If the User is adding a similar, complementary, or additional fact to something already stored, you MUST update the existing fact.
   1. Set "action" to "update".
   2. Set "delete_id" to the exact ID of the old fact (match strictly from the database list above).
   3. Set "add_text" to the COMBINED/CONSOLIDATED statement in Russian (e.g. "Пользователь любит апельсины и бананы").
-
 Respond ONLY with a valid JSON object matching this schema (do NOT write any conversational text or thinking tags, just JSON):
 {
   "action": "add", "update", "delete", or "none",
@@ -1474,15 +1253,11 @@ Respond ONLY with a valid JSON object matching this schema (do NOT write any con
   "delete_text": "the exact text of the memory being deleted/replaced",
   "tags": ["array", "of", "relevant", "short", "tags", "in", "english"]
 }`;
-
     const isGeminiModel = selectedModel.startsWith("gemini-");
     let responseText = "";
-
     try {
-     
       if (isGeminiModel) {
         if (!geminiApiKey.trim()) return;
-
         const res = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${geminiApiKey}`,
           {
@@ -1491,7 +1266,6 @@ Respond ONLY with a valid JSON object matching this schema (do NOT write any con
             body: JSON.stringify({
               contents: [{ role: "user", parts: [{ text: prompt }] }],
               generationConfig: {
-               
                 responseMimeType: "application/json", 
                 temperature: 0.1
               }
@@ -1501,7 +1275,6 @@ Respond ONLY with a valid JSON object matching this schema (do NOT write any con
         const data = await res.json();
         responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
       } 
-     
       else {
         const res = await fetch("http://127.0.0.1:11500/api/chat", {
           method: "POST",
@@ -1520,8 +1293,6 @@ Respond ONLY with a valid JSON object matching this schema (do NOT write any con
         const data = await res.json();
         responseText = data.message?.content || "";
       }
-
-     
       let cleanText = responseText.trim();
       if (cleanText.startsWith("```")) {
         cleanText = cleanText
@@ -1529,10 +1300,7 @@ Respond ONLY with a valid JSON object matching this schema (do NOT write any con
           .replace(/```$/, "")        
           .trim();
       }
-
-     
       const parsed = JSON.parse(cleanText);
-
       if (parsed.action && parsed.action !== "none") {
         setPendingChange({
           action: parsed.action,
@@ -1551,30 +1319,35 @@ const handleCreateModel = async () => {
       setCreateModelError("All fields are required.");
       return;
     }
-    
     setIsCreatingModel(true);
     setCreateModelError("");
-
     try {
-     
-      await invoke("create_local_model", { 
-        name: newModelName, 
-        ggufPath: newModelGgufPath 
-      });
-
-     
-      const res = await fetch("http://127.0.0.1:11500/api/tags");
-      const data = await res.json();
-      if (data.models) {
-        const names = data.models.map((m: any) => m.name);
-        setModels(names);
-        setSelectedModel(newModelName);
+      if (newModelGgufPath.toLowerCase().endsWith(".exiq")) {
+        const registeredModelName = await invoke<string>("import_exiq_model", {
+          name: newModelName,
+          filePath: newModelGgufPath
+        });
+        setModels((prev) => Array.from(new Set([registeredModelName, ...prev])));
+        setSelectedModel(registeredModelName);
+        alert(`ExisQuant Model "${registeredModelName}" imported successfully!`);
+      } 
+      else {
+        await invoke("create_local_model", { 
+          name: newModelName, 
+          ggufPath: newModelGgufPath 
+        });
+        const res = await fetch("http://127.0.0.1:11500/api/tags");
+        const data = await res.json();
+        if (data.models) {
+          const names = data.models.map((m: any) => m.name);
+          setModels(names);
+          setSelectedModel(newModelName);
+        }
+        alert(`Model "${newModelName}" created successfully!`);
       }
-
       setNewModelName("");
       setNewModelGgufPath("");
       setIsCreateModelOpen(false);
-      alert(`Model "${newModelName}" created successfully!`);
     } catch (e: any) {
       console.error("Failed to create model:", e);
       setCreateModelError(e.toString());
@@ -1582,86 +1355,66 @@ const handleCreateModel = async () => {
       setIsCreatingModel(false);
     }
   };
-const handleCaptureScreen = async () => {
+  const handleBrowseFile = async () => {
     try {
-      const currentWin = getCurrentWindow();
-      
-     
-      await currentWin.hide();
-      
-     
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-     
-      const path = await invoke<string>("capture_screen");
-      
-     
-      const assetUrl = convertFileSrc(path);
-      setScannerImage(assetUrl);
-      
-     
-      await currentWin.show();
-      await currentWin.setFocus();
+      const selectedPath = await invoke<string | null>("pick_model_file");
+      if (selectedPath) {
+        setNewModelGgufPath(selectedPath);
+        const fileName = selectedPath.split("\\").pop()?.split("/").pop() || "";
+        const baseName = fileName.replace(/\.(exiq|gguf)$/i, "");
+        if (!newModelName) {
+          setNewModelName(baseName);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to pick file:", e);
+    }
+  };
+  const handleCaptureScreen = async () => {
+    try {
+      const base64Url = await invoke<string>("capture_screen");
+      setScannerImage(base64Url);
     } catch (e) {
       console.error("Failed to capture screen:", e);
-      alert("Failed to capture screen. Verify system permissions.");
-      await getCurrentWindow().show();
+      alert(`Failed to capture screen:\n${e}`);
     }
   };
 const handleMouseUp = () => {
     if (!cropStart || !cropCurrent || !scannerImage) return;
-
-   
     const x = Math.min(cropStart.x, cropCurrent.x);
     const y = Math.min(cropStart.y, cropCurrent.y);
     const width = Math.abs(cropStart.x - cropCurrent.x);
     const height = Math.abs(cropStart.y - cropCurrent.y);
-
-   
     if (width < 10 || height < 10) {
       setCropStart(null);
       setCropCurrent(null);
       return;
     }
-
-   
     const img = new Image();
     img.src = scannerImage;
     img.onload = () => {
-     
       const canvas = document.createElement("canvas");
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext("2d");
-      
       if (ctx) {
-       
         ctx.drawImage(img, x, y, width, height, 0, 0, width, height);
-        
-       
         const croppedBase64 = canvas.toDataURL("image/jpeg");
         setImagePreview(croppedBase64);
         setAttachedImage(croppedBase64.split(",")[1]);
       }
-      
-     
       setScannerImage(null);
       setCropStart(null);
       setCropCurrent(null);
+      getCurrentWindow().setFullscreen(false);
     };
   };
-
   const handleCommitChange = async () => {
     if (!pendingChange) return;
-
     let updatedMemories = [...exisDB.memories];
-
-   
     if (pendingChange.action === "delete" || pendingChange.action === "update") {
       updatedMemories = updatedMemories.filter((m) => m.id !== pendingChange.deleteId);
     }
-
-   
     if (pendingChange.action === "add" || pendingChange.action === "update") {
       const newMemory: Memory = {
         id: `mem-${Date.now()}`,
@@ -1671,13 +1424,9 @@ const handleMouseUp = () => {
       };
       updatedMemories.push(newMemory);
     }
-
     const updatedDB: ExisDB = { memories: updatedMemories };
-
     try {
-     
       await invoke("write_exis_db", { data: JSON.stringify(updatedDB) });
-      
       setExisDB(updatedDB);
     } catch (e) {
       console.error("Failed to write updated exisdb.json:", e);
@@ -1698,7 +1447,6 @@ const handleMouseUp = () => {
            geminiApiKey={geminiApiKey}
            setIsCreateModelOpen={setIsCreateModelOpen}
            handleCaptureScreen={handleCaptureScreen}
-          
            throttleInBg={throttleInBg}
            throttlePercent={throttlePercent}
            presencePenalty={presencePenalty}
@@ -1709,7 +1457,6 @@ const handleMouseUp = () => {
          />
        );
      }
-
   return (
     <div className="main-layout">
       {}
@@ -1727,7 +1474,6 @@ const handleMouseUp = () => {
               onClick={() => setActiveChatId(c.id)}
             >
               <span>[ {c.title} ]</span>
-              
               {}
               {chats.length > 1 && (
                 <button 
@@ -1743,20 +1489,17 @@ const handleMouseUp = () => {
             </div>
           ))}
         </div>
-        
         {}
           <div className="sidebar-footer">
           <button className="settings-btn" onClick={() => setIsSettingsOpen(true)}>
             CORE SETTINGS
           </button>
-          
           {}
           <div className="sidebar-branding">
             created by examegd(ex.)
           </div>
         </div>
       </aside>
-
       {}
       <div className="chat-container">
         <header className="header">
@@ -1770,7 +1513,6 @@ const handleMouseUp = () => {
             <div className="logo-glyph"></div>
             <span className="title">exis.Architect</span>
           </div>
-
           {}
           <div className="model-selector-container">
             <span className="model-label">ACTIVE_SYSTEM:</span>
@@ -1794,7 +1536,6 @@ const handleMouseUp = () => {
               ))}
             </select>
           </div>
-
           {}
           <div className="system-monitor">
             <div className="metric">CPU: <span>{cpuUsage.toFixed(1)}%</span></div>
@@ -1802,26 +1543,21 @@ const handleMouseUp = () => {
             <div className="metric">PORT: <span>11500</span></div>
           </div>
         </header>
-
         {}
         <main className="chat-area">
           {activeChat.messages.map((msg) => (
             <div key={msg.id} className={`message ${msg.sender}`}>
-              
               {}
               {msg.thinking && <ThinkingBlock content={msg.thinking} />}
               {}
               {msg.image && (
                 <img src={msg.image} className="message-image" alt="user attachment" />
               )}
-
               {}
               {msg.sources && <SourcesBlock sources={msg.sources} />}
-              
               <div className="message-text">
                 {renderMessageContent(msg.text)}
               </div>
-
               {}
               {msg.speed && (
                 <div className="generation-speed">
@@ -1841,7 +1577,6 @@ const handleMouseUp = () => {
               </div>
               <span style={{ color: "#00bcff" }}>EXISDB_SYNC</span>
             </div>
-            
             <div className="change-content">
               {}
               {(pendingChange.action === "delete" || pendingChange.action === "update") && (
@@ -1861,7 +1596,6 @@ const handleMouseUp = () => {
                 </div>
               )}
             </div>
-
             <div className="change-actions">
               {}
               <button className="abort-btn" onClick={() => setPendingChange(null)}>
@@ -1886,7 +1620,6 @@ const handleMouseUp = () => {
             </button>
           </div>
         )}
-
         {}
         <footer className="input-panel">
           {}
@@ -1897,7 +1630,6 @@ const handleMouseUp = () => {
             accept="image/*"
             onChange={handleImageUpload}
           />
-
           {}
           <button 
             className="attach-file-btn"
@@ -1907,7 +1639,6 @@ const handleMouseUp = () => {
           >
             <PaperclipIcon />
           </button>
-
           {}
           <button 
             className={`search-toggle-btn ${isWebSearchEnabled ? "active" : ""}`}
@@ -1965,7 +1696,6 @@ const handleMouseUp = () => {
             className={`send-button ${isGenerating ? "generating" : ""}`}
             onMouseEnter={() => setIsButtonHovered(true)}
             onMouseLeave={() => setIsButtonHovered(false)}
-           
             onClick={isGenerating ? handleAbortGeneration : handleSend}
             disabled={!isGenerating && !inputValue.trim()}
           >
@@ -1986,44 +1716,51 @@ const handleMouseUp = () => {
                 ABORT
               </button>
             </div>
-
             {createModelError && (
               <div style={{ color: "#ff4a4a", fontSize: "11px", fontFamily: "monospace", marginBottom: "15px" }}>
                 ERROR: {createModelError}
               </div>
             )}
-
             <div className="settings-group">
               <label className="settings-label">Model Identifier (Name):</label>
               <input
                 type="text"
                 className="settings-input"
-                placeholder="e.g. my-custom-qwen"
+                placeholder="e.g. my-tinyllama or custom-qwen"
                 value={newModelName}
                 onChange={(e) => setNewModelName(e.target.value)}
                 disabled={isCreatingModel}
               />
             </div>
-
             <div className="settings-group" style={{ marginTop: "15px" }}>
-              <label className="settings-label">Local GGUF File Path:</label>
-              <input
-                type="text"
-                className="settings-input"
-                placeholder="e.g. C:\Users\plane\Downloads\model.gguf"
-                value={newModelGgufPath}
-                onChange={(e) => setNewModelGgufPath(e.target.value)}
-                disabled={isCreatingModel}
-              />
+              <label className="settings-label">Model File Path (.exiq / .gguf):</label>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <input
+                  type="text"
+                  className="settings-input"
+                  placeholder="Select model file..."
+                  value={newModelGgufPath}
+                  onChange={(e) => setNewModelGgufPath(e.target.value)}
+                  disabled={isCreatingModel}
+                />
+                <button
+                  className="send-button"
+                  style={{ borderColor: "#00bcff", color: "#00bcff", padding: "0 14px" }}
+                  onClick={handleBrowseFile}
+                  disabled={isCreatingModel}
+                  type="button"
+                >
+                  BROWSE
+                </button>
+              </div>
             </div>
-
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "25px" }}>
               <button 
                 className="send-button"
                 onClick={handleCreateModel}
                 disabled={isCreatingModel}
               >
-                {isCreatingModel ? "COMPILING..." : "COMPILE MODEL"}
+                {isCreatingModel ? "PROCESSING..." : "REGISTER MODEL"}
               </button>
             </div>
           </div>
@@ -2042,10 +1779,8 @@ const handleMouseUp = () => {
                 SAVE & CLOSE
               </button>
             </div>
-            
             {}
             <div className="settings-grid">
-              
               {}
               <div className="settings-col-left">
                 {}
@@ -2058,7 +1793,6 @@ const handleMouseUp = () => {
                     onChange={(e) => setSystemPrompt(e.target.value)}
                   />
                 </div>
-
                 {}
                 <div className="settings-row">
                   <div className="settings-group">
@@ -2080,7 +1814,6 @@ const handleMouseUp = () => {
                     />
                     <span>Throttle computation when minimized to tray</span>
                   </label>
-
                   {}
                   {throttleInBg && (
                     <div style={{ marginTop: "10px", paddingLeft: "20px" }}>
@@ -2109,7 +1842,6 @@ const handleMouseUp = () => {
                       />
                     </div>
                   )}
-                  
                 </div>
                   <div className="settings-group">
                     <label className="settings-label">Context Size (Min 512):</label>
@@ -2121,7 +1853,20 @@ const handleMouseUp = () => {
                     />
                   </div>
                 </div>
-
+              <div className="settings-group" style={{ borderBottom: "1px solid var(--border-glow)", paddingBottom: "12px", marginBottom: "12px" }}>
+                <label className="settings-label" style={{ color: "#00ff88", fontWeight: "bold" }}>
+                  COMPUTE BACKEND (EXISQUANT):
+                </label>
+                <select
+                  className="settings-input"
+                  value={computeDevice}
+                  onChange={(e) => setComputeDevice(e.target.value)}
+                >
+                  <option value="auto">🟢 AUTO {gpuName ? `(${gpuName})` : "(CPU Fallback)"}</option>
+                  <option value="cuda">🚀 NVIDIA CUDA {gpuName ? `(${gpuName})` : ""}</option>
+                  <option value="cpu">💻 CPU (AVX2 SIMD)</option>
+                </select>
+              </div>
                 {}
                 <div className="settings-row">
                   <div className="settings-group">
@@ -2145,7 +1890,6 @@ const handleMouseUp = () => {
                     />
                   </div>
                 </div>
-
                 {}
                 <div className="settings-row">
                   <div className="settings-group">
@@ -2168,7 +1912,6 @@ const handleMouseUp = () => {
                     />
                   </div>
                 </div>
-
                 {}
                 <div className="settings-row">
                   <div className="settings-group">
@@ -2193,7 +1936,6 @@ const handleMouseUp = () => {
                   </div>
                 </div>
               </div>
-
               {}
               <div className="settings-col-right">
                 {}
@@ -2207,10 +1949,9 @@ const handleMouseUp = () => {
                     onChange={(e) => setTavilyApiKey(e.target.value)}
                   />
                 </div>
-
                 {}
                 <div className="settings-group">
-                  <label className="settings-label" style={{ color: "#00ff88" }}>GOOGLE GEMINI API KEY (Cloud Models)</label>
+                  <label className="settings-label" style={{ color: "#00ff88" }}>GOOGLE API KEY (Cloud Models)</label>
                   <input
                     type="password"
                     className="settings-input"
@@ -2218,15 +1959,10 @@ const handleMouseUp = () => {
                     value={geminiApiKey}
                     onChange={(e) => setGeminiApiKey(e.target.value)}
                   />
-                  <div style={{ fontSize: "9px", color: "var(--text-muted)", marginTop: "-2px" }}>
-                    Get a free API key at <span style={{ color: "#00ff88", cursor: "pointer" }} onClick={() => handleOpenLink("https://aistudio.google.com")}>aistudio.google.com</span>.
-                  </div>
                 </div>
-
                 {}
                 <div className="settings-group" style={{ borderTop: "1px solid var(--border-glow)", paddingTop: "12px", marginTop: "5px" }}>
                   <label className="settings-label" style={{ color: "#00bcff" }}>MEMORY DATABASE (exisdb.json)</label>
-                  
                   <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                     <textarea
                       className="settings-textarea"
@@ -2252,7 +1988,6 @@ const handleMouseUp = () => {
                       </button>
                     </div>
                   </div>
-
                   {}
                   <div style={{ maxHeight: "80px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "4px" }}>
                     {exisDB.memories.length === 0 ? (
@@ -2323,17 +2058,13 @@ const handleMouseUp = () => {
           </div>
         </div>
       )}
-
       {}
-      
                         </div>
-                        
                       ))
                     )}
                   </div>
                 </div>
               </div>
-
             </div>
           </div>
         </div>

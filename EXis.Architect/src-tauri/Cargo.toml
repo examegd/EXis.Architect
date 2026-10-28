@@ -1,8 +1,8 @@
 [package]
 name = "exisarchitect"
-version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+version = "2.0.0"
+description = "exisarchitect"
+authors = ["examegd"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -16,6 +16,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+cc = "1.0"
 
 [dependencies]
 tauri = { version = "2.0.0", features = [ "tray-icon" ] }
@@ -23,3 +24,18 @@ tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sysinfo = "0.30"
+axum = "0.7"
+tokio = { version = "1", features = ["full"] }
+tower-http = { version = "0.5", features = ["cors"] }
+futures-util = "0.3"
+# --- НАШ ДВИЖОК EXISQUANT ---
+memmap2 = "0.9"
+half = "2.3"
+rayon = "1.10"
+tokenizers = "0.20"
+
+[profile.dev]
+opt-level = 3
+debug = false
+
+
